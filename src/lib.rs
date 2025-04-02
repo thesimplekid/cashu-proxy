@@ -97,7 +97,7 @@ impl CashuProxy {
             spending_conditions,
             allowed_mints,
             cost: config.cost.into(),
-            min_lock_time: config.min_lock_time.unwrap_or(86400),
+            min_lock_time: config.min_lock_time,
             upstream_addr,
             signing_key: secret_key,
             payout_payment_request: PaymentRequest::from_str(&config.payout_payment_request)?,
