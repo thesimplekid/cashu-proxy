@@ -42,6 +42,8 @@ fn main() {
         }
     };
 
+    // Spawn task here
+
     let mut lb = http_proxy_service(&server.configuration, cashu_proxy);
     lb.add_tcp(&config.listen_addr);
 
