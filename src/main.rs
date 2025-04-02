@@ -1,4 +1,3 @@
-use anyhow::bail;
 use bip39::Mnemonic;
 use cashu_proxy::config::ProxyConfig;
 use cashu_proxy::CashuProxy;
