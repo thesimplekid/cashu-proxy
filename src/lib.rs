@@ -27,6 +27,7 @@ pub struct CashuProxy {
     wallet: MultiMintWallet,
     upstream_addr: (String, u16),
     signing_key: SecretKey,
+    payout_payment_request: String,
 }
 
 impl CashuProxy {
@@ -93,6 +94,7 @@ impl CashuProxy {
             min_lock_time: config.min_lock_time.unwrap_or(86400),
             upstream_addr,
             signing_key: secret_key,
+            payout_payment_request: config.payout_payment_request.clone(),
         })
     }
 
@@ -158,10 +160,18 @@ impl CashuProxy {
     pub async fn pay_out(&self) -> anyhow::Result<()> {
         for wallet in self.wallet.get_wallets().await {
             let balance = wallet.total_balance().await?;
-
-            let send = wallet.prepare_send(balance, SendOptions::default()).await?;
-
-            let send = wallet.send(send, None).await?.proofs();
+            
+            if balance > Amount::ZERO {
+                let send = wallet.prepare_send(balance, SendOptions::default()).await?;
+                
+                // Use the configured payment request for payouts
+                let send = wallet.send(send, Some(&self.payout_payment_request)).await?;
+                
+                tracing::info!(
+                    "Paid out {} to payment request", 
+                    balance
+                );
+            }
         }
 
         Ok(())
