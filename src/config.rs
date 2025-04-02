@@ -14,7 +14,7 @@ pub struct ProxyConfig {
     pub db_path: Option<PathBuf>,
     pub secret_key: Option<String>,
     pub payout_payment_request: String,
-    pub payout_interval: Option<u64>,
+    pub payout_interval: u64,
 }
 
 impl Default for ProxyConfig {
@@ -28,7 +28,7 @@ impl Default for ProxyConfig {
             db_path: None,
             secret_key: None,
             payout_payment_request: "lnbc...".to_string(), // Placeholder, must be replaced in actual config
-            payout_interval: Some(900),                    // Default 900 seconds (15 minutes)
+            payout_interval: 900,                          // Default 900 seconds (15 minutes)
         }
     }
 }

@@ -43,7 +43,7 @@ fn main() {
     };
 
     // Spawn task for periodic payouts
-    let payout_interval_secs = config.payout_interval.unwrap_or(3600); // Default to 3600 seconds (1 hour) if not specified
+    let payout_interval_secs = config.payout_interval;
     let proxy_clone = cashu_proxy.clone();
 
     assert!(config.min_lock_time < payout_interval_secs);
