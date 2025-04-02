@@ -1,0 +1,3 @@
+/target
+.aider*
+.pre-commit-config.yaml

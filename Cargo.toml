@@ -1,0 +1,33 @@
+[package]
+name = "cashu-proxy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "cashu_proxy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cashu-proxy"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.97"
+async-trait = "0.1.88"
+bip39 = { version = "2.1.0", features = ["rand"] }
+cdk = { git = "https://github.com/thesimplekid/cdk", branch = "p2pk_nut18", default-features = false, features = ["wallet"] }
+cdk-redb = { git = "https://github.com/thesimplekid/cdk", branch = "p2pk_nut18", default-features = false, features = ["wallet"] }
+config = { version = "0.15.11", features = ["toml"] }
+serde = { version = "1.0", features = ["derive"] }
+home = "0.5.11"
+pingora = { version = "0.4.0", default-features = false, features = ["proxy"] }
+pingora-core = "0.4.0"
+pingora-http = "0.4.0"
+pingora-proxy = "0.4.0"
+tokio = "1.44.1"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+# https://github.com/cloudflare/pingora/issues/568
+[patch.crates-io]
+sfv = { git = "https://github.com/undef1nd/sfv.git", tag = "v0.9.4" }

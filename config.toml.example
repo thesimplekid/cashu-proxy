@@ -1,0 +1,24 @@
+# Cashu Proxy Configuration
+
+# Address to listen on
+listen_addr = "0.0.0.0:6188"
+
+# Upstream server to proxy to
+upstream_addr = "127.0.0.1:8085"
+
+# List of mints to use
+mints = [
+  "https://nofees.testnut.cashu.space"
+]
+
+# Cost in satoshis per request
+cost = 1
+
+# Minimum lock time in seconds (how long a token is valid after payment)
+min_lock_time = 300
+
+# Secret key for P2PK conditions (REQUIRED)
+secret_key = "your-secret-key-here"
+
+# Optional custom database path
+# db_path = "/path/to/custom/database.redb"
