@@ -42,7 +42,23 @@ fn main() {
         }
     };
 
-    // Spawn task here
+    // Spawn task for periodic payouts
+    let payout_interval = config.payout_interval.unwrap_or(60); // Default to 60 minutes if not specified
+    let proxy_clone = cashu_proxy.clone();
+    tokio::spawn(async move {
+        let interval_secs = payout_interval * 60; // Convert minutes to seconds
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+        
+        loop {
+            interval.tick().await;
+            tracing::info!("Running scheduled payout");
+            
+            match proxy_clone.pay_out().await {
+                Ok(_) => tracing::info!("Scheduled payout completed successfully"),
+                Err(e) => tracing::error!("Scheduled payout failed: {}", e),
+            }
+        }
+    });
 
     let mut lb = http_proxy_service(&server.configuration, cashu_proxy);
     lb.add_tcp(&config.listen_addr);

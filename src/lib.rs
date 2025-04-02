@@ -24,6 +24,7 @@ use pingora_proxy::{ProxyHttp, Session};
 
 pub mod config;
 
+#[derive(Clone)]
 pub struct CashuProxy {
     allowed_mints: Vec<MintUrl>,
     spending_conditions: SpendingConditions,
