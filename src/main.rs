@@ -46,7 +46,7 @@ fn main() {
     let payout_interval_secs = config.payout_interval;
     let proxy_clone = cashu_proxy.clone();
 
-    assert!(config.min_lock_time < payout_interval_secs);
+    assert!(config.min_lock_time > payout_interval_secs);
 
     tokio::spawn(async move {
         let mut interval =
