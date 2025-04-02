@@ -10,7 +10,7 @@ pub struct ProxyConfig {
     pub upstream_addr: String,
     pub mints: Vec<String>,
     pub cost: u64,
-    pub min_lock_time: Option<u64>,
+    pub min_lock_time: u64,
     pub db_path: Option<PathBuf>,
     pub secret_key: Option<String>,
     pub payout_payment_request: String,
@@ -24,7 +24,7 @@ impl Default for ProxyConfig {
             upstream_addr: "127.0.0.1:8085".to_string(),
             mints: vec!["https://nofees.testnut.cashu.space".to_string()],
             cost: 1,
-            min_lock_time: Some(300), // 5 minutes default lock time
+            min_lock_time: 300, // 5 minutes default lock time
             db_path: None,
             secret_key: None,
             payout_payment_request: "lnbc...".to_string(), // Placeholder, must be replaced in actual config
