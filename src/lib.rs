@@ -6,12 +6,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{anyhow, bail};
 use async_trait::async_trait;
 use bip39::Mnemonic;
-use cdk::amount::SplitTarget;
 use cdk::mint_url::MintUrl;
 use cdk::nuts::nut18::PaymentRequestBuilder;
-use cdk::nuts::{Conditions, CurrencyUnit, SecretKey, SigFlag, SpendingConditions, Token};
+use cdk::nuts::{Conditions, CurrencyUnit, SecretKey, SigFlag, SpendingConditions, State, Token};
+use cdk::types::ProofInfo;
 use cdk::wallet::types::WalletKey;
-use cdk::wallet::MultiMintWallet;
+use cdk::wallet::{MultiMintWallet, SendOptions};
 use cdk::Amount;
 use pingora_core::prelude::*;
 use pingora_http::{RequestHeader, ResponseHeader};
@@ -141,24 +141,28 @@ impl CashuProxy {
 
         wallet.verify_token_p2pk(&token, conditions)?;
 
-        // This is really just for demo
-        //
-        // in practice you would not want to claim proofs just keep them as p2pk locked and handle request
-        let r = wallet
-            .receive(
-                &token.to_string(),
-                SplitTarget::default(),
-                &[self.signing_key.clone()],
-                &[],
-            )
-            .await?;
-        tracing::debug!("Received {} for request", r);
+        let mint_url = wallet.mint_url;
+        let unit = wallet.unit;
 
-        let unspent = wallet.get_unspent_proofs().await?;
+        let proofs_info: Vec<ProofInfo> = token
+            .proofs()
+            .into_iter()
+            .flat_map(|p| ProofInfo::new(p, mint_url.clone(), State::Unspent, unit.clone()))
+            .collect();
 
-        let token = Token::new(wallet.mint_url.clone(), unspent, None, wallet.unit.clone());
+        wallet.localstore.update_proofs(proofs_info, vec![]).await?;
 
-        tracing::debug!("{}", token.to_string());
+        Ok(())
+    }
+
+    pub async fn pay_out(&self) -> anyhow::Result<()> {
+        for wallet in self.wallet.get_wallets().await {
+            let balance = wallet.total_balance().await?;
+
+            let send = wallet.prepare_send(balance, SendOptions::default()).await?;
+
+            let send = wallet.send(send, None).await?.proofs();
+        }
 
         Ok(())
     }
