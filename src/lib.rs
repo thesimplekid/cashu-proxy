@@ -6,13 +6,18 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{anyhow, bail};
 use async_trait::async_trait;
 use bip39::Mnemonic;
+use cdk::amount::SplitTarget;
 use cdk::mint_url::MintUrl;
-use cdk::nuts::nut18::PaymentRequestBuilder;
-use cdk::nuts::{Conditions, CurrencyUnit, SecretKey, SigFlag, SpendingConditions, State, Token};
+use cdk::nuts::{
+    Conditions, CurrencyUnit, PaymentRequest, PaymentRequestBuilder, PaymentRequestPayload,
+    SecretKey, SigFlag, SpendingConditions, State, Token, TransportType,
+};
 use cdk::types::ProofInfo;
 use cdk::wallet::types::WalletKey;
 use cdk::wallet::{MultiMintWallet, SendOptions};
 use cdk::Amount;
+use nostr_sdk::nips::nip19::Nip19Profile;
+use nostr_sdk::{Client as NostrClient, EventBuilder, FromBech32, Keys};
 use pingora_core::prelude::*;
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
@@ -27,7 +32,7 @@ pub struct CashuProxy {
     wallet: MultiMintWallet,
     upstream_addr: (String, u16),
     signing_key: SecretKey,
-    payout_payment_request: String,
+    payout_payment_request: PaymentRequest,
 }
 
 impl CashuProxy {
@@ -94,7 +99,7 @@ impl CashuProxy {
             min_lock_time: config.min_lock_time.unwrap_or(86400),
             upstream_addr,
             signing_key: secret_key,
-            payout_payment_request: config.payout_payment_request.clone(),
+            payout_payment_request: PaymentRequest::from_str(&config.payout_payment_request)?,
         })
     }
 
@@ -160,17 +165,94 @@ impl CashuProxy {
     pub async fn pay_out(&self) -> anyhow::Result<()> {
         for wallet in self.wallet.get_wallets().await {
             let balance = wallet.total_balance().await?;
-            
+
             if balance > Amount::ZERO {
-                let send = wallet.prepare_send(balance, SendOptions::default()).await?;
-                
+                let proofs = wallet.get_unspent_proofs().await?;
+
+                let amount_rec = wallet
+                    .receive_proofs(
+                        proofs,
+                        SplitTarget::default(),
+                        &[self.signing_key.clone()],
+                        &[],
+                    )
+                    .await?;
+
+                let send = wallet
+                    .prepare_send(amount_rec, SendOptions::default())
+                    .await?;
+
                 // Use the configured payment request for payouts
-                let send = wallet.send(send, Some(&self.payout_payment_request)).await?;
-                
-                tracing::info!(
-                    "Paid out {} to payment request", 
-                    balance
+                let proofs = wallet.send(send, None).await?.proofs();
+
+                // We prefer nostr transport if it is available to hide ip.
+                let transport = self
+                    .payout_payment_request
+                    .transports
+                    .iter()
+                    .find(|t| t._type == TransportType::Nostr)
+                    .ok_or(anyhow!("Nostr transport not defined"))?;
+
+                let keys = Keys::generate();
+                let client = NostrClient::new(keys.clone());
+                let nprofile = Nip19Profile::from_bech32(&transport.target)?;
+
+                println!("{:?}", nprofile.relays);
+
+                let payload = PaymentRequestPayload {
+                    id: self.payout_payment_request.payment_id.clone(),
+                    memo: None,
+                    mint: wallet.mint_url.clone(),
+                    unit: wallet.unit.clone(),
+                    proofs,
+                };
+
+                let rumor = EventBuilder::new(
+                    nostr_sdk::Kind::from_u16(14),
+                    serde_json::to_string(&payload)?,
                 );
+
+                let relays = nprofile.relays;
+
+                for relay in relays.iter() {
+                    client.add_write_relay(relay).await?;
+                }
+
+                client.connect().await;
+
+                let gift_wrap = client
+                    .gift_wrap_to(
+                        relays,
+                        &nprofile.public_key,
+                        rumor.build(keys.public_key),
+                        None,
+                    )
+                    .await?;
+
+                println!(
+                    "Published event {} succufully to {}",
+                    gift_wrap.val,
+                    gift_wrap
+                        .success
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+
+                if !gift_wrap.failed.is_empty() {
+                    println!(
+                        "Could not publish to {:?}",
+                        gift_wrap
+                            .failed
+                            .keys()
+                            .map(|relay| relay.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                }
+
+                tracing::info!("Paid out {} to payment request", balance);
             }
         }
 
@@ -218,7 +300,10 @@ impl ProxyHttp for CashuProxy {
 
         let filter = match self.get_x_cashu(session) {
             Some(x_cashu) => match self.verify_x_cashu(&x_cashu).await {
-                Ok(()) => false,
+                Ok(()) => {
+                    self.pay_out().await.unwrap();
+                    false
+                }
                 Err(_) => true,
             },
 
