@@ -43,10 +43,9 @@ fn main() {
     };
 
     // Spawn task for periodic payouts
-    let payout_interval = config.payout_interval.unwrap_or(60); // Default to 60 minutes if not specified
+    let payout_interval_secs = config.payout_interval.unwrap_or(3600); // Default to 3600 seconds (1 hour) if not specified
     let proxy_clone = cashu_proxy.clone();
     tokio::spawn(async move {
-        let interval_secs = payout_interval * 60; // Convert minutes to seconds
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
 
         loop {

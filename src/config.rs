@@ -28,7 +28,7 @@ impl Default for ProxyConfig {
             db_path: None,
             secret_key: None,
             payout_payment_request: "lnbc...".to_string(), // Placeholder, must be replaced in actual config
-            payout_interval: Some(900), // Default 15 minutes (900 seconds)
+            payout_interval: Some(900), // Default 900 seconds (15 minutes)
         }
     }
 }
