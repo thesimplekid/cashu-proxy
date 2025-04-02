@@ -13,6 +13,7 @@ pub struct ProxyConfig {
     pub min_lock_time: Option<u64>,
     pub db_path: Option<PathBuf>,
     pub secret_key: Option<String>,
+    pub payout_payment_request: String,
 }
 
 impl Default for ProxyConfig {
@@ -25,6 +26,7 @@ impl Default for ProxyConfig {
             min_lock_time: Some(300), // 5 minutes default lock time
             db_path: None,
             secret_key: None,
+            payout_payment_request: "lnbc...".to_string(), // Placeholder, must be replaced in actual config
         }
     }
 }

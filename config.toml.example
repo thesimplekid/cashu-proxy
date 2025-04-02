@@ -20,8 +20,8 @@ min_lock_time = 300
 # Secret key for P2PK conditions (REQUIRED)
 secret_key = "your-secret-key-here"
 
-# Optional payment request for receiving payouts
-# payout_payment_request = "lnbc..."
+# Payment request for receiving payouts (REQUIRED)
+payout_payment_request = "lnbc..."
 
 # Optional custom database path
 # db_path = "/path/to/custom/database.redb"
