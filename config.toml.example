@@ -23,5 +23,8 @@ secret_key = "your-secret-key-here"
 # Payment request for receiving payouts (REQUIRED)
 payout_payment_request = "lnbc..."
 
+# Interval in seconds between automatic payouts (default: 900 seconds / 15 minutes)
+# payout_interval = 900
+
 # Optional custom database path
 # db_path = "/path/to/custom/database.redb"
