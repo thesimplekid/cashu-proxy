@@ -48,11 +48,11 @@ fn main() {
     tokio::spawn(async move {
         let interval_secs = payout_interval * 60; // Convert minutes to seconds
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
-        
+
         loop {
             interval.tick().await;
             tracing::info!("Running scheduled payout");
-            
+
             match proxy_clone.pay_out().await {
                 Ok(_) => tracing::info!("Scheduled payout completed successfully"),
                 Err(e) => tracing::error!("Scheduled payout failed: {}", e),
