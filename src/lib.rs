@@ -197,7 +197,7 @@ impl CashuProxy {
                 let client = NostrClient::new(keys.clone());
                 let nprofile = Nip19Profile::from_bech32(&transport.target)?;
 
-                println!("{:?}", nprofile.relays);
+                tracing::debug!("Relays: {:?}", nprofile.relays);
 
                 let payload = PaymentRequestPayload {
                     id: self.payout_payment_request.payment_id.clone(),
@@ -229,8 +229,8 @@ impl CashuProxy {
                     )
                     .await?;
 
-                println!(
-                    "Published event {} succufully to {}",
+                tracing::info!(
+                    "Published event {} successfully to {}",
                     gift_wrap.val,
                     gift_wrap
                         .success
@@ -241,8 +241,8 @@ impl CashuProxy {
                 );
 
                 if !gift_wrap.failed.is_empty() {
-                    println!(
-                        "Could not publish to {:?}",
+                    tracing::warn!(
+                        "Could not publish to {}",
                         gift_wrap
                             .failed
                             .keys()
