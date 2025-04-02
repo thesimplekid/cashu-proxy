@@ -42,13 +42,16 @@ fn main() {
         }
     };
 
+    // Create a Tokio runtime for the main thread
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    
     // Spawn task for periodic payouts
     let payout_interval_secs = config.payout_interval;
     let proxy_clone = cashu_proxy.clone();
 
     assert!(config.min_lock_time > payout_interval_secs);
 
-    tokio::spawn(async move {
+    rt.spawn(async move {
         let mut interval =
             tokio::time::interval(tokio::time::Duration::from_secs(payout_interval_secs));
 
