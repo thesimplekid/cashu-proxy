@@ -6,7 +6,7 @@ use cdk::nuts::{PublicKey, State};
 use redb::{Database, ReadableTable, TableDefinition};
 use serde::{Deserialize, Serialize};
 
-const SEEN_YS_TABLE: TableDefinition<[u8; 33], &str> = TableDefinition::new("seen_ys");
+const SEEN_YS_TABLE: TableDefinition<[u8; 33], bool> = TableDefinition::new("seen_ys");
 
 #[derive(Clone)]
 pub struct Db {
@@ -41,7 +41,13 @@ impl Db {
                 // First collect current states
                 for y in ys {
                     let current_state = match table.get(y.to_bytes())? {
-                        Some(state) => Some(serde_json::from_str(state.value())?),
+                        Some(spent) => {
+                            if spent.value() {
+                                Some(State::Spent)
+                            } else {
+                                Some(State::Unspent)
+                            }
+                        },
                         None => None,
                     };
                     states.push(current_state);
@@ -59,9 +65,9 @@ impl Db {
             let mut table = write_txn.open_table(SEEN_YS_TABLE)?;
             {
                 // If no proofs are spent, proceed with update
-                let state_str = serde_json::to_string(&proofs_state)?;
+                let is_spent = matches!(proofs_state, State::Spent);
                 for y in ys {
-                    table.insert(y.to_bytes(), state_str.as_str())?;
+                    table.insert(y.to_bytes(), is_spent)?;
                 }
             }
         }
