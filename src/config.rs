@@ -11,7 +11,7 @@ pub struct ProxyConfig {
     pub mints: Vec<String>,
     pub cost: u64,
     pub min_lock_time: u64,
-    pub db_path: Option<PathBuf>,
+    pub work_dir: Option<PathBuf>,
     pub secret_key: Option<String>,
     pub payout_payment_request: String,
     pub payout_interval: u64,
@@ -25,7 +25,7 @@ impl Default for ProxyConfig {
             mints: vec!["https://nofees.testnut.cashu.space".to_string()],
             cost: 1,
             min_lock_time: 300, // 5 minutes default lock time
-            db_path: None,
+            work_dir: None,
             secret_key: None,
             payout_payment_request: "lnbc...".to_string(), // Placeholder, must be replaced in actual config
             payout_interval: 900,                          // Default 900 seconds (15 minutes)
@@ -59,9 +59,10 @@ impl ProxyConfig {
     }
 
     pub fn get_db_path(&self) -> PathBuf {
-        match &self.db_path {
+        let base_dir = match &self.work_dir {
             Some(path) => path.clone(),
-            None => crate::work_dir().unwrap().join("cashu_proxy.redb"),
-        }
+            None => crate::work_dir().unwrap(),
+        };
+        base_dir.join("cashu_proxy.redb")
     }
 }
