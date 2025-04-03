@@ -301,10 +301,7 @@ impl ProxyHttp for CashuProxy {
 
         let filter = match self.get_x_cashu(session) {
             Some(x_cashu) => match self.verify_x_cashu(&x_cashu).await {
-                Ok(()) => {
-                    self.pay_out().await.unwrap();
-                    false
-                }
+                Ok(()) => false,
                 Err(_) => true,
             },
 
