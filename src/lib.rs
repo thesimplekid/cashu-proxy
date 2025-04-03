@@ -157,6 +157,20 @@ impl CashuProxy {
             bail!("Unit {} is not sat", unit);
         }
 
+        let token_value = token.value()?;
+        if token_value < self.cost {
+            tracing::warn!(
+                "Token value {} is less then cost {}.",
+                token_value,
+                self.cost
+            );
+            bail!(
+                "Token value {} is less then cost {}.",
+                token_value,
+                self.cost
+            );
+        }
+
         // Check if the mint is allowed
         if !self.allowed_mints.contains(&mint) {
             tracing::warn!("Token from disallowed mint: {}", mint);
@@ -197,21 +211,21 @@ impl CashuProxy {
             }),
         );
 
+        if let Err(err) = wallet.verify_token_dleq(&token).await {
+            tracing::warn!("Token did not have valid dleq: {}", err);
+            bail!("Token did not have valid dleq: {}", err);
+        }
+
         // Verify the token
         if let Err(e) = wallet.verify_token_p2pk(&token, conditions) {
             tracing::warn!("Token verification failed: {}", e);
             bail!("Token verification failed: {}", e);
         }
+
         tracing::debug!("Token verified successfully");
 
         let proofs = token.proofs();
         let proof_count = proofs.len();
-
-        if proof_count == 0 {
-            tracing::warn!("Token contains no proofs");
-            bail!("Invalid token: contains no proofs");
-        }
-        tracing::debug!("Token contains {} proofs", proof_count);
 
         // Extract public keys from proofs
         let ys: Vec<PublicKey> = proofs.iter().flat_map(|p| p.y()).collect();
