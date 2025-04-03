@@ -128,69 +128,129 @@ impl CashuProxy {
     }
 
     pub async fn verify_x_cashu(&self, token: &str) -> anyhow::Result<()> {
-        tracing::debug!("Verifying header");
-        let token = Token::from_str(token)?;
-        let mint = token.mint_url()?;
+        tracing::debug!("Verifying X-Cashu token");
+        
+        // Parse the token
+        let token = match Token::from_str(token) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("Invalid token format: {}", e);
+                bail!("Invalid token format: {}", e);
+            }
+        };
+        
+        // Get the mint URL
+        let mint = match token.mint_url() {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!("Failed to extract mint URL from token: {}", e);
+                bail!("Invalid token: missing or invalid mint URL: {}", e);
+            }
+        };
 
+        // Check if the mint is allowed
         if !self.allowed_mints.contains(&mint) {
-            bail!("Mint not allowed");
+            tracing::warn!("Token from disallowed mint: {}", mint);
+            bail!("Mint not allowed: {}", mint);
         }
+        tracing::debug!("Token from allowed mint: {}", mint);
 
-        let wallet = self
+        // Get the wallet for this mint
+        let wallet = match self
             .wallet
-            .get_wallet(&WalletKey::new(mint, CurrencyUnit::Sat))
+            .get_wallet(&WalletKey::new(mint.clone(), CurrencyUnit::Sat))
             .await
-            .unwrap();
+        {
+            Some(w) => w,
+            None => {
+                tracing::error!("Failed to get wallet for mint: {}", mint);
+                bail!("Internal error: wallet not found for mint: {}", mint);
+            }
+        };
 
+        // Create spending conditions with locktime
+        let pubkey = match self.spending_conditions.pubkeys() {
+            Some(keys) if !keys.is_empty() => keys[0].clone(),
+            _ => {
+                tracing::error!("No pubkey available for spending conditions");
+                bail!("Configuration error: no pubkey available for spending conditions");
+            }
+        };
+        
         let conditions = SpendingConditions::new_p2pk(
-            self.spending_conditions
-                .pubkeys()
-                .expect("Pubkey required")
-                .first()
-                .expect("One pubkey required")
-                .clone(),
+            pubkey,
             Some(Conditions {
                 locktime: Some(unix_time() + self.min_lock_time - 3600),
                 ..Default::default()
             }),
         );
 
-        wallet.verify_token_p2pk(&token, conditions)?;
+        // Verify the token
+        if let Err(e) = wallet.verify_token_p2pk(&token, conditions) {
+            tracing::warn!("Token verification failed: {}", e);
+            bail!("Token verification failed: {}", e);
+        }
+        tracing::debug!("Token verified successfully");
 
         let mint_url = wallet.mint_url;
         let unit = wallet.unit;
 
         let proofs = token.proofs();
         let proof_count = proofs.len();
+        
+        if proof_count == 0 {
+            tracing::warn!("Token contains no proofs");
+            bail!("Invalid token: contains no proofs");
+        }
+        tracing::debug!("Token contains {} proofs", proof_count);
 
+        // Extract public keys from proofs
         let ys: Vec<PublicKey> = proofs.iter().flat_map(|p| p.y()).collect();
 
-        assert_eq!(ys.len(), proof_count);
+        if ys.len() != proof_count {
+            tracing::error!("Proof count mismatch: expected {}, got {}", proof_count, ys.len());
+            bail!("Internal error: proof count mismatch");
+        }
 
+        // Check if proofs have been spent before
         match self.proxy_db.update_proofs_states(&ys, State::Spent).await {
             Ok(states) => {
                 if states.contains(&Some(State::Spent)) {
-                    bail!("Proof already spent");
+                    tracing::warn!("Double-spend attempt detected");
+                    bail!("Payment rejected: one or more proofs have already been spent");
                 }
+                tracing::debug!("All proofs are valid and unspent");
             }
             Err(err) => {
-                if err.to_string().contains("already") {
-                    bail!("Proof already seen");
+                let err_msg = err.to_string();
+                if err_msg.contains("Double-spend") || err_msg.contains("already been spent") {
+                    tracing::warn!("Double-spend attempt: {}", err_msg);
+                    bail!("Payment rejected: {}", err_msg);
+                } else {
+                    tracing::error!("Database error during proof verification: {}", err_msg);
+                    bail!("Internal error: failed to verify proofs: {}", err_msg);
                 }
-
-                bail!("Some database error");
             }
         }
 
+        // Create ProofInfo objects for wallet storage
         let proofs_info: Vec<ProofInfo> = proofs
             .into_iter()
             .flat_map(|p| ProofInfo::new(p, mint_url.clone(), State::Unspent, unit.clone()))
             .collect();
 
-        assert_eq!(proofs_info.len(), proof_count);
+        if proofs_info.len() != proof_count {
+            tracing::error!("Failed to create ProofInfo for all proofs");
+            bail!("Internal error: failed to process all proofs");
+        }
 
-        wallet.localstore.update_proofs(proofs_info, vec![]).await?;
-
+        // Update the wallet with the new proofs
+        if let Err(e) = wallet.localstore.update_proofs(proofs_info, vec![]).await {
+            tracing::error!("Failed to update wallet with proofs: {}", e);
+            bail!("Internal error: failed to update wallet: {}", e);
+        }
+        
+        tracing::info!("Successfully verified and processed token with {} proofs from {}", proof_count, mint);
         Ok(())
     }
 
