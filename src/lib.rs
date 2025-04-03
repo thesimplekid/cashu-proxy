@@ -36,6 +36,7 @@ pub struct CashuProxy {
     upstream_addr: (String, u16),
     signing_key: SecretKey,
     payout_payment_request: PaymentRequest,
+    proxy_db: Arc<Db>,
 }
 
 impl CashuProxy {
@@ -96,7 +97,7 @@ impl CashuProxy {
         let port = parts[1].parse::<u16>().unwrap_or(8085);
         let upstream_addr = (host, port);
 
-        let proxy_db = Db::new(&config.work_dir)?;
+        let proxy_db = Arc::new(Db::new(&config.work_dir)?);
 
         Ok(Self {
             wallet,
@@ -107,6 +108,7 @@ impl CashuProxy {
             upstream_addr,
             signing_key: secret_key,
             payout_payment_request: PaymentRequest::from_str(&config.payout_payment_request)?,
+            proxy_db,
         })
     }
 
