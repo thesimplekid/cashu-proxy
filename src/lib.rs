@@ -16,13 +16,15 @@ use cdk::types::ProofInfo;
 use cdk::wallet::types::WalletKey;
 use cdk::wallet::{MultiMintWallet, SendOptions};
 use cdk::Amount;
+use db::Db;
 use nostr_sdk::nips::nip19::Nip19Profile;
 use nostr_sdk::{Client as NostrClient, EventBuilder, FromBech32, Keys};
 use pingora_core::prelude::*;
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
 
-pub mod config;
+mod config;
+mod db;
 
 #[derive(Clone)]
 pub struct CashuProxy {
@@ -42,8 +44,10 @@ impl CashuProxy {
         mnemonic: Mnemonic,
         spending_conditions: Option<SpendingConditions>,
     ) -> anyhow::Result<Self> {
-        let db_path = config.get_db_path();
-        let localstore = cdk_redb::WalletRedbDatabase::new(&db_path).unwrap();
+        let db_path = &config.work_dir;
+        let wallet_db = db_path.join("cdk_wallet.redb");
+
+        let localstore = cdk_redb::WalletRedbDatabase::new(&wallet_db).unwrap();
 
         let wallet = MultiMintWallet::new(
             Arc::new(localstore),
@@ -91,6 +95,8 @@ impl CashuProxy {
         let host = parts[0].to_string();
         let port = parts[1].parse::<u16>().unwrap_or(8085);
         let upstream_addr = (host, port);
+
+        let proxy_db = Db::new(&config.work_dir)?;
 
         Ok(Self {
             wallet,
