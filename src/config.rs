@@ -4,6 +4,8 @@ use anyhow::Result;
 use config::{Config, ConfigError, File};
 use serde::{Deserialize, Serialize};
 
+use crate::work_dir;
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProxyConfig {
     pub listen_addr: String,
@@ -11,7 +13,7 @@ pub struct ProxyConfig {
     pub mints: Vec<String>,
     pub cost: u64,
     pub min_lock_time: u64,
-    pub work_dir: Option<PathBuf>,
+    pub work_dir: PathBuf,
     pub secret_key: Option<String>,
     pub payout_payment_request: String,
     pub payout_interval: u64,
@@ -25,7 +27,7 @@ impl Default for ProxyConfig {
             mints: vec!["https://nofees.testnut.cashu.space".to_string()],
             cost: 1,
             min_lock_time: 300, // 5 minutes default lock time
-            work_dir: None,
+            work_dir: work_dir().expect("Could not find work dir"),
             secret_key: None,
             payout_payment_request: "lnbc...".to_string(), // Placeholder, must be replaced in actual config
             payout_interval: 900,                          // Default 900 seconds (15 minutes)
@@ -56,13 +58,5 @@ impl ProxyConfig {
 
         // Deserialize the config into our ProxyConfig struct
         config.try_deserialize()
-    }
-
-    pub fn get_db_path(&self) -> PathBuf {
-        let base_dir = match &self.work_dir {
-            Some(path) => path.clone(),
-            None => crate::work_dir().unwrap(),
-        };
-        base_dir.join("cashu_proxy.redb")
     }
 }

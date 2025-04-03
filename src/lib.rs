@@ -23,7 +23,7 @@ use pingora_core::prelude::*;
 use pingora_http::{RequestHeader, ResponseHeader};
 use pingora_proxy::{ProxyHttp, Session};
 
-mod config;
+pub mod config;
 mod db;
 
 #[derive(Clone)]
@@ -97,7 +97,9 @@ impl CashuProxy {
         let port = parts[1].parse::<u16>().unwrap_or(8085);
         let upstream_addr = (host, port);
 
-        let proxy_db = Arc::new(Db::new(&config.work_dir)?);
+        let proxy_db_path = config.work_dir.join("proxy_db.redb");
+
+        let proxy_db = Arc::new(Db::new(&proxy_db_path)?);
 
         Ok(Self {
             wallet,
@@ -129,7 +131,7 @@ impl CashuProxy {
 
     pub async fn verify_x_cashu(&self, token: &str) -> anyhow::Result<()> {
         tracing::debug!("Verifying X-Cashu token");
-        
+
         // Parse the token
         let token = match Token::from_str(token) {
             Ok(t) => t,
@@ -138,7 +140,7 @@ impl CashuProxy {
                 bail!("Invalid token format: {}", e);
             }
         };
-        
+
         // Get the mint URL
         let mint = match token.mint_url() {
             Ok(m) => m,
@@ -147,6 +149,13 @@ impl CashuProxy {
                 bail!("Invalid token: missing or invalid mint URL: {}", e);
             }
         };
+
+        let unit = token.unit().unwrap_or_default();
+
+        if unit != CurrencyUnit::Sat {
+            tracing::warn!("Token unit {} expected sat.", unit);
+            bail!("Unit {} is not sat", unit);
+        }
 
         // Check if the mint is allowed
         if !self.allowed_mints.contains(&mint) {
@@ -158,7 +167,7 @@ impl CashuProxy {
         // Get the wallet for this mint
         let wallet = match self
             .wallet
-            .get_wallet(&WalletKey::new(mint.clone(), CurrencyUnit::Sat))
+            .get_wallet(&WalletKey::new(mint.clone(), unit.clone()))
             .await
         {
             Some(w) => w,
@@ -168,15 +177,18 @@ impl CashuProxy {
             }
         };
 
+        assert_eq!(unit, wallet.unit);
+        assert_eq!(mint, wallet.mint_url);
+
         // Create spending conditions with locktime
         let pubkey = match self.spending_conditions.pubkeys() {
-            Some(keys) if !keys.is_empty() => keys[0].clone(),
+            Some(keys) if !keys.is_empty() => keys[0],
             _ => {
                 tracing::error!("No pubkey available for spending conditions");
                 bail!("Configuration error: no pubkey available for spending conditions");
             }
         };
-        
+
         let conditions = SpendingConditions::new_p2pk(
             pubkey,
             Some(Conditions {
@@ -192,12 +204,9 @@ impl CashuProxy {
         }
         tracing::debug!("Token verified successfully");
 
-        let mint_url = wallet.mint_url;
-        let unit = wallet.unit;
-
         let proofs = token.proofs();
         let proof_count = proofs.len();
-        
+
         if proof_count == 0 {
             tracing::warn!("Token contains no proofs");
             bail!("Invalid token: contains no proofs");
@@ -207,10 +216,7 @@ impl CashuProxy {
         // Extract public keys from proofs
         let ys: Vec<PublicKey> = proofs.iter().flat_map(|p| p.y()).collect();
 
-        if ys.len() != proof_count {
-            tracing::error!("Proof count mismatch: expected {}, got {}", proof_count, ys.len());
-            bail!("Internal error: proof count mismatch");
-        }
+        assert_eq!(proof_count, ys.len());
 
         // Check if proofs have been spent before
         match self.proxy_db.update_proofs_states(&ys, State::Spent).await {
@@ -236,21 +242,22 @@ impl CashuProxy {
         // Create ProofInfo objects for wallet storage
         let proofs_info: Vec<ProofInfo> = proofs
             .into_iter()
-            .flat_map(|p| ProofInfo::new(p, mint_url.clone(), State::Unspent, unit.clone()))
+            .flat_map(|p| ProofInfo::new(p, mint.clone(), State::Unspent, unit.clone()))
             .collect();
 
-        if proofs_info.len() != proof_count {
-            tracing::error!("Failed to create ProofInfo for all proofs");
-            bail!("Internal error: failed to process all proofs");
-        }
+        assert_eq!(proof_count, proofs_info.len());
 
         // Update the wallet with the new proofs
         if let Err(e) = wallet.localstore.update_proofs(proofs_info, vec![]).await {
             tracing::error!("Failed to update wallet with proofs: {}", e);
             bail!("Internal error: failed to update wallet: {}", e);
         }
-        
-        tracing::info!("Successfully verified and processed token with {} proofs from {}", proof_count, mint);
+
+        tracing::info!(
+            "Successfully verified and processed token with {} proofs from {}",
+            proof_count,
+            mint
+        );
         Ok(())
     }
 
