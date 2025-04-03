@@ -27,7 +27,7 @@ impl Db {
         Ok(Self { inner: db })
     }
 
-    async fn update_proofs_states(
+    pub async fn update_proofs_states(
         &self,
         ys: &[PublicKey],
         proofs_state: State,
@@ -47,7 +47,7 @@ impl Db {
                             } else {
                                 Some(State::Unspent)
                             }
-                        },
+                        }
                         None => None,
                     };
                     states.push(current_state);

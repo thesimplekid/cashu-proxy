@@ -10,7 +10,7 @@ use cdk::amount::SplitTarget;
 use cdk::mint_url::MintUrl;
 use cdk::nuts::{
     Conditions, CurrencyUnit, PaymentRequest, PaymentRequestBuilder, PaymentRequestPayload,
-    SecretKey, SigFlag, SpendingConditions, State, Token, TransportType,
+    PublicKey, SecretKey, SigFlag, SpendingConditions, State, Token, TransportType,
 };
 use cdk::types::ProofInfo;
 use cdk::wallet::types::WalletKey;
@@ -160,11 +160,34 @@ impl CashuProxy {
         let mint_url = wallet.mint_url;
         let unit = wallet.unit;
 
-        let proofs_info: Vec<ProofInfo> = token
-            .proofs()
+        let proofs = token.proofs();
+        let proof_count = proofs.len();
+
+        let ys: Vec<PublicKey> = proofs.iter().flat_map(|p| p.y()).collect();
+
+        assert_eq!(ys.len(), proof_count);
+
+        match self.proxy_db.update_proofs_states(&ys, State::Spent).await {
+            Ok(states) => {
+                if states.contains(&Some(State::Spent)) {
+                    bail!("Proof already spent");
+                }
+            }
+            Err(err) => {
+                if err.to_string().contains("already") {
+                    bail!("Proof already seen");
+                }
+
+                bail!("Some database error");
+            }
+        }
+
+        let proofs_info: Vec<ProofInfo> = proofs
             .into_iter()
             .flat_map(|p| ProofInfo::new(p, mint_url.clone(), State::Unspent, unit.clone()))
             .collect();
+
+        assert_eq!(proofs_info.len(), proof_count);
 
         wallet.localstore.update_proofs(proofs_info, vec![]).await?;
 
