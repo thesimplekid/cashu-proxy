@@ -20,10 +20,10 @@ cdk-redb = { git = "https://github.com/thesimplekid/cdk", branch = "p2pk_nut18",
 config = { version = "0.15.11", features = ["toml"] }
 serde = { version = "1.0", features = ["derive"] }
 home = "0.5.11"
-pingora = { version = "0.4.0", default-features = false, features = ["proxy"] }
-pingora-core = "0.4.0"
-pingora-http = "0.4.0"
-pingora-proxy = "0.4.0"
+pingora = { version = "0.5.0", default-features = false, features = ["proxy"] }
+pingora-core = "0.5.0"
+pingora-http = "0.5.0"
+pingora-proxy = "0.5.0"
 tokio = "1.44.1"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
@@ -35,7 +35,3 @@ nostr-sdk = { version = "0.40.0", default-features = false, features = [
 serde_json = "1.0.140"
 redb = "2.4.0"
 
-
-# https://github.com/cloudflare/pingora/issues/568
-[patch.crates-io]
-sfv = { git = "https://github.com/undef1nd/sfv.git", tag = "v0.9.4" }
