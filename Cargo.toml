@@ -38,3 +38,14 @@ bloomfilter = "3.0.1"
 bitcoin = "0.32.5"
 redb = "2.5.0"
 
+[dev-dependencies]
+criterion = "0.5.1"
+rand = "0.9.1"
+
+[[bench]]
+name = "bench_bloom_filter"
+harness = false
+
+[[bench]]
+name = "bench_proof_reads"
+harness = false
