@@ -8,7 +8,7 @@ use cdk::nuts::PublicKey;
 use cdk::nuts::SecretKey;
 
 fn bench_proof_reads(c: &mut Criterion) {
-    let num_items = 100000;
+    let num_items = 100;
     let db_path = PathBuf::from("test_data/database.redb");
     let db = Arc::new(Db::new(&db_path).unwrap());
     let mut rng = rng();

@@ -6,7 +6,7 @@ use std::thread;
 use rand::{rng, RngCore};
 
 fn bench_bloom_filter(c: &mut Criterion) {
-    let num_items = 100000;
+    let num_items = 100;
     let fp_rate = 0.001;
     let bloom: Arc<Mutex<Bloom<PublicKey>>> = Arc::new(Mutex::new(Bloom::new_for_fp_rate(num_items, fp_rate).unwrap()));
     let mut rng = rng();
