@@ -97,6 +97,33 @@ impl Db {
         Ok(())
     }
 
+    /// Get proofs with the specified y-values from the database
+    pub fn get_proofs_by_ys(&self, ys: &[PublicKey]) -> Result<HashMap<String, Vec<ProofWithKey>>> {
+        let mut result = HashMap::<String, Vec<ProofWithKey>>::new();
+
+        if ys.is_empty() {
+           return Ok(result);
+        }
+
+        let read_txn = self.inner.begin_read()?;
+        let table = read_txn.open_table(PROOFS_TABLE)?;
+
+        for y in ys.iter() {
+            let entry = table.get(y.to_hex().as_str())?;
+            
+            if let Some(value) = entry {
+                let proof_with_key: ProofWithKey = serde_json::from_str(&value.value().to_string())?;  
+                
+                result
+                    .entry(proof_with_key.mint_url.clone())
+                    .or_insert_with(Vec::new)
+                    .push(proof_with_key);
+            }
+        }
+
+        Ok(result)
+    }
+
     /// Store a key pair in the database
     pub fn add_keypair(&self, keypair: KeyPair) -> Result<()> {
         let write_txn = self.inner.begin_write()?;

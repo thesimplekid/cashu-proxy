@@ -35,7 +35,7 @@ use serde_json;
 use tokio::sync::{Mutex, RwLock};
 
 pub mod config;
-mod db;
+pub mod db;
 
 #[derive(Clone)]
 pub struct CashuProxy {
