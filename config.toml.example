@@ -17,8 +17,8 @@ cost = 1
 # Minimum lock time in seconds (how long a token is valid after payment)
 min_lock_time = 300
 
-# Secret key for P2PK conditions (REQUIRED)
-secret_key = "your-secret-key-here"
+# Secret key for P2PK conditions (OPTIONAL - will be derived from mnemonic if not provided)
+# secret_key = "your-secret-key-here"
 
 # Payment request for receiving payouts (REQUIRED)
 payout_payment_request = "lnbc..."
